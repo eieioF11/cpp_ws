@@ -19,8 +19,6 @@
 #include <matplotlibcpp17/pyplot.h>
 // OpenMP
 #include <omp.h>
-// OpenCV
-#include <opencv2/opencv.hpp>
 // Eigen
 #include <Eigen/Dense>
 // utility
