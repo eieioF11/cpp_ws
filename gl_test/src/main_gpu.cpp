@@ -1,30 +1,59 @@
 #include <iostream>
 #include <vector>
+#include <string>
+#include <numeric>
+#include <chrono>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 // #include <gl/glew.h>
 // #include <glfw/glfw3.h>
 
+#define NUM 100000000
+
 namespace {
 
 const char* compute_shader_source = R"(
 #version 430
-
 uniform uint element_size;
+
+uint hash3(uint x, uint y, uint z) {
+    x += x >> 11;
+    x ^= x << 7;
+    x += y;
+    x ^= x << 3;
+    x += z ^ (x >> 14);
+    x ^= x << 6;
+    x += x >> 15;
+    x ^= x << 5;
+    x += x >> 12;
+    x ^= x << 9;
+    return x;
+}
+
+float random(vec3 f) {
+    uint mantissaMask = 0x007FFFFFu;
+    uint one = 0x3F800000u;
+    uvec3 u = floatBitsToUint(f);
+    uint h = hash3(u.x, u.y, u.z);
+    return uintBitsToFloat((h & mantissaMask) | one) - 1.0;
+}
 
 layout(std430, binding = 3) buffer layout_dst
 {
-    float dst[];
+    int dst[];
 };
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 void main() {
     uint index = gl_GlobalInvocationID.x;
-    if (index >= element_size) { return; }
-
-    dst[index] = mix(0.0, 3.141592653589, float(index) / element_size);
+    // if (index >= element_size) { return; }
+    float x = random(gl_GlobalInvocationID);
+    float y = random(gl_GlobalInvocationID.yzx);
+    if ((x*x + y*y) <= 1.0) {
+        dst[index] = 1;
+    }
 }
 )";
 
@@ -107,7 +136,7 @@ void deleteComputeShaderProgram(GLuint program) {
 
 
 void compute() {
-    uint32_t num = 100000;
+    uint32_t num = NUM;
 
     GLuint shader_program = createComputeShaderProgram(compute_shader_source);
 
@@ -116,7 +145,7 @@ void compute() {
     GLuint ssbo;
     glGenBuffers(1, &ssbo);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, num * sizeof(float), nullptr, GL_DYNAMIC_COPY);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, num * sizeof(int), nullptr, GL_DYNAMIC_COPY);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     glUseProgram(shader_program);
@@ -128,29 +157,34 @@ void compute() {
 
     glUseProgram(0);
 
-    std::vector<float> data(num);
+    std::vector<int> data(num);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, num * sizeof(float), data.data());
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, num * sizeof(int), data.data());
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-    for (auto v : data) { std::cout << v << '\n'; }
+    // for (auto v : data) { std::cout << v << '\n'; }
 
     glDeleteBuffers(1, &ssbo);
 
     deleteComputeShaderProgram(shader_program);
+    // calc pi
+    size_t sum = std::accumulate(data.begin(), data.end(), 0LL);
+    std::cout << "sum : " << sum << std::endl;
+    std::cout << "pi : " << 4.0 * sum / num << std::endl;
 }
 
 }
 
 int main(int argc, char* argv[]) {
+    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
     try {
         initOpenGL();
-
         compute();
-
         terminateOpenGL();
     }
     catch (std::exception & e) {
         std::cerr << e.what() << std::endl;
     }
+    double stime = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000.0);
+    std::cout << "time : " << stime << " ms" << std::endl;
 }
