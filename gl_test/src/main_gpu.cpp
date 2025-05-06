@@ -136,6 +136,7 @@ void deleteComputeShaderProgram(GLuint program) {
 
 
 void compute() {
+    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
     uint32_t num = NUM;
 
     GLuint shader_program = createComputeShaderProgram(compute_shader_source);
@@ -167,6 +168,8 @@ void compute() {
     glDeleteBuffers(1, &ssbo);
 
     deleteComputeShaderProgram(shader_program);
+    double stime = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000.0);
+    std::cout << "gpu loop time : " << stime << " ms" << std::endl;
     // calc pi
     size_t sum = std::accumulate(data.begin(), data.end(), 0LL);
     std::cout << "sum : " << sum << std::endl;
@@ -176,6 +179,7 @@ void compute() {
 }
 
 int main(int argc, char* argv[]) {
+    std::cout << "number of elements: " << NUM << std::endl;
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
     try {
         initOpenGL();
@@ -186,5 +190,5 @@ int main(int argc, char* argv[]) {
         std::cerr << e.what() << std::endl;
     }
     double stime = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() / 1000.0);
-    std::cout << "time : " << stime << " ms" << std::endl;
+    std::cout << "all time : " << stime << " ms" << std::endl;
 }
